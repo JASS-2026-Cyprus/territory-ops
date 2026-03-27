@@ -7,7 +7,7 @@ RUN git clone --depth 1 \
     https://x-access-token:${GITHUB_TOKEN}@github.com/JASS-2026-Cyprus/Territory_maintenance.git \
     /maintenance
 
-RUN pip install --no-cache-dir -r /maintenance/requirements.txt requests
+RUN pip install --no-cache-dir --timeout 300 --retries 5 -r /maintenance/requirements.txt requests
 
 WORKDIR /ops
 COPY main.py .
