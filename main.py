@@ -40,7 +40,13 @@ def start_agent():
 
 def check_blackboard():
     r = requests.get("https://blackboard.jass.school/api/log", timeout=10)
+    r.raise_for_status()
+    text = r.text.strip()
+    if not text:
+        return [], -1, 0
     entries = r.json()
+    if not isinstance(entries, list):
+        entries = entries.get("entries", [])
     last_idx = -1
     for i, e in enumerate(entries):
         if "blackboard_context_compressor" in e:
