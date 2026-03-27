@@ -1,0 +1,55 @@
+name: Reload on Update
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: reload-on-update
+  cancel-in-progress: false
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current SHA of Territory_maintenance
+        id: sha
+        run: |
+          SHA=$(gh api repos/JASS-2026-Cyprus/Territory_maintenance/commits/main --jq '.sha')
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "Current SHA: $SHA"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore deploy state cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/deploy-state
+          key: deployed-sha-${{ steps.sha.outputs.sha }}
+
+      - name: Deploy Territory_maintenance
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'root' }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: JASS-2026-Cyprus/Territory_maintenance
+          GITHUB_REF: refs/heads/main
+          CLOUDFLARE_TUNNEL: ${{ vars.CLOUDFLARE_TUNNEL || 'false' }}
+          DEPLOY_DIRECTORY: ${{ vars.DEPLOY_DIRECTORY || '' }}
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/robocy-lab/deploy-action/main/deploy.sh | bash
+
+      - name: Save deployed SHA to cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: mkdir -p /tmp/deploy-state && echo "${{ steps.sha.outputs.sha }}" > /tmp/deploy-state/sha.txt
+
+      - name: Store cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/deploy-state
+          key: deployed-sha-${{ steps.sha.outputs.sha }}
